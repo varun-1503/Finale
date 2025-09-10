@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cyber Threat Dashboard — SOC View</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+  :root{
+    --bg1:#02040a;    /* near-black */
+    --bg2:#071226;    /* deep blue */
+    --accent:#ff4d4f; /* red */
+    --accent-2:#ff9f1c; /* orange */
+    --cyber:#2bd4ff;  /* cyan highlights */
+    --card: rgba(255,255,255,0.02);
+    --muted: rgba(180,200,220,0.12);
+    --glass-border: rgba(43,212,255,0.06);
+    --text: #e6f7fb;
+    --ok: #2ee6a7;
+  }
+  html,body{height:100%; margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--text); -webkit-font-smoothing:antialiased;}
+  /* particle canvas */
+  #particles{position:fixed; inset:0; z-index:0; pointer-events:none}
+
+  .wrap{position:relative; z-index:1; max-width:1200px; margin:24px auto; padding:18px;}
+  header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px}
+  .brand{display:flex; align-items:center; gap:12px}
+  .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#071226,#00121a);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.04);box-shadow:0 8px 30px rgba(11,20,30,0.6)}
+  .logo strong{color:var(--cyber); font-size:20px}
+  h1{font-size:20px; margin:0; color:var(--cyber)}
+  .subtitle{font-size:12px; color:rgba(200,235,245,0.7)}
+
+  /* controls */
+  .controls{display:flex; gap:10px; align-items:center}
+  .seg{display:flex; background:rgba(255,255,255,0.02); padding:6px; border-radius:10px; border:1px solid var(--glass-border)}
+  .seg button{background:transparent; border:0; color:var(--text); padding:8px 12px; cursor:pointer; font-weight:700; font-size:13px; border-radius:8px; transition:all .14s}
+  .seg button.active{background:linear-gradient(90deg, rgba(255,77,79,0.08), rgba(255,159,28,0.05)); box-shadow:0 8px 30px rgba(255,77,79,0.04); transform:translateY(-2px)}
+  .segment-right{display:flex; gap:8px; align-items:center}
+
+  /* dropdown */
+  .zone-select{background:#071226;color:var(--text);border:1px solid rgba(43,212,255,0.06);padding:8px 10px;border-radius:8px;font-weight:700;box-shadow:0 6px 24px rgba(2,18,30,0.4)}
+  .zone-select option{background:#071226;color:var(--text)}
+
+  .btn{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04); background:transparent;color:var(--text); font-weight:700; cursor:pointer}
+  .btn.primary{background:linear-gradient(90deg,#ff4d4f,#ff9f1c); color:#071226; box-shadow:0 10px 40px rgba(255,77,79,0.08)}
+  .btn.ghost{border:1px solid rgba(43,212,255,0.06)}
+
+  /* grid */
+  .grid{display:grid; grid-template-columns:repeat(12,1fr); gap:16px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:16px; border-radius:12px; border:1px solid var(--glass-border); backdrop-filter:blur(8px); box-shadow:0 8px 40px rgba(0,0,0,0.6); position:relative; overflow:hidden; transition:transform .25s, box-shadow .25s, opacity .25s}
+  .card:hover{transform:translateY(-6px); box-shadow:0 18px 80px rgba(0,0,0,0.75)}
+  .card h3{margin:0; color:var(--cyber); display:flex; justify-content:space-between; align-items:center}
+  .muted{color:rgba(200,230,240,0.75); font-size:13px}
+  .small{font-size:12px; color:rgba(200,230,240,0.6)}
+  .badge{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--accent)}
+
+  /* sizes */
+  .col-4{grid-column:span 4}
+  .col-8{grid-column:span 8}
+  .col-12{grid-column:span 12}
+  .chart-sm{height:120px}
+  .chart-lg{height:300px}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; margin-top:12px; font-size:13px}
+  th,td{padding:8px; border-bottom:1px solid rgba(255,255,255,0.02); text-align:left}
+  th{color:var(--cyber); font-weight:700}
+  td{color:#e7f9fb}
+  tr.alert:hover{background:rgba(255,77,79,0.04); cursor:pointer}
+
+  /* severity chips */
+  .sev-high{color:#2b0404;background:linear-gradient(90deg,#ff4d4f,#ff7a66); padding:6px 8px;border-radius:8px;font-weight:700}
+  .sev-med{color:#3b2500;background:linear-gradient(90deg,#ff9f1c,#ffd27a); padding:6px 8px;border-radius:8px;font-weight:700}
+  .sev-low{color:#06240b;background:linear-gradient(90deg,#2ee6a7,#6feec1); padding:6px 8px;border-radius:8px;font-weight:700}
+
+  /* modal */
+  .modal{position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(2,6,12,0.6); z-index:40; opacity:0; pointer-events:none; transition:opacity .18s}
+  .modal.show{opacity:1; pointer-events:auto}
+  .modal .box{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:18px; border-radius:12px; width:720px; border:1px solid rgba(43,212,255,0.06)}
+  .close{float:right; cursor:pointer; color:var(--muted)}
+
+  /* subtle entry */
+  .loaded .card{opacity:0; transform:translateY(8px)}
+  .loaded .card.show{opacity:1; transform:none}
+  @media (max-width:980px){ .col-4, .col-8, .col-12{grid-column:span 12} header{flex-direction:column; align-items:flex-start} .controls{width:100%} }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<div class="wrap loaded" id="app">
+  <header>
+    <div class="brand">
+      <div class="logo"><strong>SOC</strong></div>
+      <div>
+        <h1>Security Operations Center — Threat Overview</h1>
+        <div class="subtitle">Live simulation • Detections • Incidents • Host Risk</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="seg" role="tablist" aria-label="Threat filters">
+        <button class="active" data-filter="all">All</button>
+        <button data-filter="malware">Malware</button>
+        <button data-filter="phishing">Phishing</button>
+        <button data-filter="ddos">DDoS</button>
+        <button data-filter="intrusion">Intrusion</button>
+      </div>
+
+      <div class="segment-right">
+        <select id="zoneSelect" class="zone-select" title="Network segment">
+          <option value="all">All Segments</option>
+          <option value="dmz">DMZ</option>
+          <option value="internal">Internal</option>
+          <option value="cloud">Cloud</option>
+          <option value="remote">Remote</option>
+        </select>
+
+        <button class="btn ghost" id="refreshBtn" title="Regenerate simulated feeds">Refresh</button>
+        <button class="btn primary" id="investigateBtn">Investigate</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="grid" id="grid">
+    <!-- KPI: Active Alerts -->
+    <div class="card col-4" id="kpiAlerts">
+      <h3>Active Alerts <span class="small" id="kpiSegment">All</span></h3>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="muted">Current Alerts</div>
+            <div style="font-size:28px;font-weight:800" id="alertCount">—</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Sev High</div>
+            <div class="sev-high" id="sevHigh">0</div>
+          </div>
+        </div>
+        <div style="margin-top:12px" class="chart-sm"><canvas id="threatTimes"></canvas></div>
+      </div>
+    </div>
+
+    <!-- KPI: Top Hosts -->
+    <div class="card col-4" id="kpiHosts">
+      <h3>Top Affected Hosts <span class="small">by incidents</span></h3>
+      <div class="chart-sm"><canvas id="hostsBar"></canvas></div>
+      <div style="margin-top:8px" class="muted">Click a host row below to inspect</div>
+    </div>
+
+    <!-- KPI: Threat Mix -->
+    <div class="card col-4" id="kpiMix">
+      <h3>Threat Mix</h3>
+      <div class="chart-sm"><canvas id="threatDonut"></canvas></div>
+      <div style="display:flex; gap:8px; margin-top:8px">
+        <div class="small"><span style="display:inline-block;width:10px;height:10px;background:var(--accent);margin-right:6px"></span> Malware</div>
+        <div class="small"><span style="display:inline-block;width:10px;height:10px;background:var(--accent-2);margin-right:6px"></span> Phishing</div>
+      </div>
+    </div>
+
+    <!-- Main timeline / details -->
+    <div class="card col-8" id="cardMain">
+      <h3 id="mainTitle">Threat Timeline — All Segments</h3>
+      <div class="muted">Detections over last 24 hours</div>
+      <div class="chart-lg" style="margin-top:12px"><canvas id="mainTimeline"></canvas></div>
+      <table><thead><tr><th>Zone</th><th>Type</th><th>Count</th><th>Last seen</th></tr></thead>
+        <tbody id="zoneSummary"></tbody></table>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="card col-4" id="cardAlerts">
+      <h3>Recent Alerts</h3>
+      <div class="muted">Click an alert to view details</div>
+      <table><thead><tr><th>Alert</th><th>Severity</th><th>Host</th></tr></thead>
+        <tbody id="alertsTable"></tbody></table>
+    </div>
+
+    <!-- Sources / IOC -->
+    <div class="card col-4" id="cardSources">
+      <h3>Detection Sources</h3>
+      <div class="muted">IDS • EDR • SIEM • Honeypot</div>
+      <div class="chart-sm" style="margin-top:12px"><canvas id="sourceRadar"></canvas></div>
+      <div style="margin-top:8px" id="sourceLegend" class="small"></div>
+    </div>
+
+    <!-- Services -->
+    <div class="card col-4" id="cardServices">
+      <h3>Service Status</h3>
+      <div class="muted">SIEM, EDR, Firewall avail.</div>
+      <table style="margin-top:10px"><thead><tr><th>Service</th><th>Latency</th><th>Uptime</th></tr></thead><tbody id="servicesTbl"></tbody></table>
+    </div>
+
+    <!-- Investigations -->
+    <div class="card col-12" id="cardInvestigation">
+      <h3>Investigation Panel</h3>
+      <div class="muted">Select an alert to populate</div>
+      <div id="investPanel" style="margin-top:12px; display:grid;grid-template-columns:1fr 1fr; gap:12px">
+        <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px">
+          <div class="small">Selected Alert</div>
+          <div id="selAlert" style="margin-top:8px; font-weight:700">None</div>
+          <div class="muted" id="selDetails" style="margin-top:8px">—</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02); padding:12px; border-radius:8px">
+          <div class="small">Quick Actions</div>
+          <div style="margin-top:8px; display:flex; gap:8px">
+            <button class="btn ghost" id="isolateBtn">Isolate Host</button>
+            <button class="btn primary" id="blockBtn">Block IOC</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <footer style="margin-top:18px; text-align:center">SOC Demo • Simulated feeds for presentation</footer>
+</div>
+
+<!-- modal -->
+<div class="modal" id="modal">
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong>Alert Details</strong></div>
+      <div class="close" id="modalClose">✕</div>
+    </div>
+    <div id="modalContent" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+/* ============================
+   Particle / network background
+   ============================ */
+const p = document.getElementById('particles'); const pctx = p.getContext('2d');
+let PW = p.width = innerWidth, PH = p.height = innerHeight;
+window.addEventListener('resize', ()=>{ PW = p.width = innerWidth; PH = p.height = innerHeight; initNet(); });
+
+let nodes = [];
+function initNet(n=80){
+  nodes = [];
+  for(let i=0;i<n;i++) nodes.push({x:Math.random()*PW, y:Math.random()*PH, vx:(Math.random()-0.5)*0.4, vy:(Math.random()-0.5)*0.4, r:Math.random()*1.6+0.5});
+}
+initNet();
+
+function drawNet(){
+  pctx.clearRect(0,0,PW,PH);
+  for(let i=0;i<nodes.length;i++){
+    const a = nodes[i];
+    a.x+=a.vx; a.y+=a.vy;
+    if(a.x<0||a.x>PW) a.vx*=-1; if(a.y<0||a.y>PH) a.vy*=-1;
+    pctx.beginPath(); pctx.fillStyle = 'rgba(43,212,255,0.9)'; pctx.shadowColor='#2bd4ff'; pctx.shadowBlur=6; pctx.arc(a.x,a.y,a.r,0,Math.PI*2); pctx.fill();
+  }
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const a=nodes[i], b=nodes[j]; const dx=a.x-b.x, dy=a.y-b.y; const d=Math.hypot(dx,dy);
+      if(d<120){ pctx.beginPath(); pctx.strokeStyle = rgba(43,212,255,${0.07*(1 - d/120)}); pctx.lineWidth=1; pctx.moveTo(a.x,a.y); pctx.lineTo(b.x,b.y); pctx.stroke(); }
+    }
+  }
+  requestAnimationFrame(drawNet);
+}
+drawNet();
+
+/* ============================
+   Simulated threat data generator
+   ============================ */
+const SEGMENTS = ['dmz','internal','cloud','remote'];
+const TYPES = ['malware','phishing','ddos','intrusion'];
+
+function rnd(a,b){ return Math.round(a + Math.random()*(b-a)); }
+
+function genSnapshot(segment){
+  // returns one snapshot object
+  const base = {
+    dmz: {traffic: rnd(300,900), threats: rnd(8,26)},
+    internal: {traffic: rnd(500,1800), threats: rnd(12,45)},
+    cloud: {traffic: rnd(200,1200), threats: rnd(6,30)},
+    remote: {traffic: rnd(150,900), threats: rnd(6,20)}
+  }[segment];
+  // breakdown by type
+  const malware = rnd(0, Math.round(base.threats*0.6));
+  const phishing = rnd(0, Math.round(base.threats*0.6));
+  const ddos = rnd(0, Math.round(base.threats*0.3));
+  const intrusion = Math.max(0, base.threats - (malware+phishing+ddos));
+  // generate top hosts
+  const hosts = [];
+  const nHosts = rnd(3,6);
+  for(let i=0;i<nHosts;i++){ hosts.push({host:host-${rnd(10,99)}, hits: rnd(1, Math.max(1, base.threats/2))}); }
+  return { segment, traffic: base.traffic, threats: base.threats, breakdown:{malware,phishing,ddos,intrusion}, hosts, ts: new Date() };
+}
+
+/* time-series city structure: keep last 24 snapshots per segment */
+let STORE = {};
+SEGMENTS.forEach(s=> STORE[s]=Array.from({length:24}, ()=> genSnapshot(s)));
+
+/* flatten current alerts list */
+let ALERTS = []; // array of alert objects
+
+function genAlerts(segment, count=6){
+  ALERTS = []; const types = ['malware','phishing','ddos','intrusion'];
+  for(let i=0;i<count;i++){
+    const type = types[Math.floor(Math.random()*types.length)];
+    const sev = (type==='ddos'||type==='intrusion') ? ['high','med'][Math.floor(Math.random()*2)] : ['med','low'][Math.floor(Math.random()*2)];
+    const h = host-${rnd(10,99)}.corp;
+    ALERTS.push({
+      id: 'ALR-'+Math.floor(Math.random()*90000+1000),
+      title: ${type.toUpperCase()} detected,
+      type,
+      severity: sev,
+      host: h,
+      status: ['open','investigating','mitigated'][Math.floor(Math.random()*3)],
+      time: new Date(Date.now() - rnd(1,60)*60000).toLocaleTimeString()
+    });
+  }
+}
+
+/* initialize */
+function seedAll(){
+  SEGMENTS.forEach(s=>{
+    STORE[s] = Array.from({length:24}, ()=> genSnapshot(s));
+  });
+  genAlerts('all', 12);
+}
+seedAll();
+
+/* ============================
+   Charts (Chart.js)
+   ============================ */
+const neon = 'rgba(43,212,255,0.95)';
+const optBase = { plugins:{legend:{labels:{color:'#bfeff9'}}}, responsive:true, maintainAspectRatio:false };
+
+const threatTimesCtx = document.getElementById('threatTimes').getContext('2d');
+const threatTimes = new Chart(threatTimesCtx, {
+  type:'line',
+  data:{ labels: Array.from({length:24}, (_,i)=> i+':00'), datasets:[{label:'Detections', data: STORE.dmz.map(s=>s.threats), borderColor:'rgba(255,77,79,0.95)', backgroundColor:'rgba(255,77,79,0.08)', tension:0.3, fill:true}] },
+  options: Object.assign({}, optBase, { scales:{ x:{display:false}, y:{ticks:{color:'#bfeff9'}} } })
+});
+
+const mainCtx = document.getElementById('mainTimeline').getContext('2d');
+let mainTimeline = new Chart(mainCtx, {
+  type:'bar',
+  data:{ labels: STORE.dmz.map((_,i)=> ${i}:00), datasets:[
+    { type:'bar', label:'Malware', data: STORE.dmz.map(s=> s.breakdown.malware), backgroundColor:'rgba(255,100,30,0.85)' },
+    { type:'bar', label:'Phishing', data: STORE.dmz.map(s=> s.breakdown.phishing), backgroundColor:'rgba(255,200,80,0.85)' },
+    { type:'bar', label:'DDoS', data: STORE.dmz.map(s=> s.breakdown.ddos), backgroundColor:'rgba(255,50,50,0.85)' },
+    { type:'line', label:'Intrusion', data: STORE.dmz.map(s=> s.breakdown.intrusion), borderColor:neon, borderWidth:2, tension:0.25, fill:false }
+  ] }, options: Object.assign({}, optBase, { interaction:{mode:'index', intersect:false}, scales:{ x:{ ticks:{color:'#bfeff9'}}, y:{ ticks:{color:'#bfeff9'} } } })
+});
+
+const donutCtx = document.getElementById('threatDonut').getContext('2d');
+const threatDonut = new Chart(donutCtx, {
+  type:'doughnut',
+  data:{ labels:['Malware','Phishing','DDoS','Intrusion'], datasets:[{ data:[40,30,20,10], backgroundColor:['#ff4d4f','#ff9f1c','#ff2e2e','#2bd4ff'] }] },
+  options:Object.assign({}, optBase, { plugins:{legend:{position:'bottom', labels:{color:'#bfeff9'}}} })
+});
+
+const hostsCtx = document.getElementById('hostsBar').getContext('2d');
+const hostsBar = new Chart(hostsCtx, {
+  type:'bar',
+  data:{ labels: ['host-12','host-34','host-56'], datasets:[{ label:'Hits', data:[5,3,2], backgroundColor:'rgba(255,77,79,0.85)'}] },
+  options:Object.assign({}, optBase, { indexAxis:'y', scales:{x:{ ticks:{color:'#bfeff9'}}, y:{ticks:{color:'#bfeff9'}}} })
+});
+
+const radarCtx = document.getElementById('sourceRadar').getContext('2d');
+const sourceRadar = new Chart(radarCtx, {
+  type:'radar',
+  data:{ labels:['IDS','EDR','SIEM','Honeypot','Firewall'], datasets:[{label:'Source Strength', data:[60,75,85,30,90], backgroundColor:'rgba(43,212,255,0.08)', borderColor:neon, borderWidth:1.5}] },
+  options:Object.assign({}, optBase, { plugins:{legend:{display:false}} })
+});
+
+/* ============================
+   DOM table rendering & UI glue
+   ============================ */
+
+function summarizeBySegment(){
+  const tbody = document.getElementById('zoneSummary'); tbody.innerHTML='';
+  SEGMENTS.forEach(s=>{
+    const latest = STORE[s][STORE[s].length-1];
+    const tr = document.createElement('tr');
+    tr.innerHTML = <td style="color:#bfeff9">${s.toUpperCase()}</td><td>${Object.values(latest.breakdown).reduce((a,b)=>a+b,0)}</td><td>${latest.breakdown.intrusion}</td><td>${latest.ts? latest.ts.toLocaleTimeString() : '-'}</td>;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderAlerts(filter='all', segment='all'){
+  const tbody = document.getElementById('alertsTable'); tbody.innerHTML='';
+  // filter ALERTS according to filter & segment (simulated)
+  const filtered = ALERTS.filter(a => (filter==='all' || a.type===filter) && (segment==='all' || segmentMatches(a,segment)));
+  filtered.slice(0,12).forEach(a=>{
+    const tr = document.createElement('tr');
+    tr.classList.add('alert');
+    tr.dataset.id = a.id;
+    tr.innerHTML = `<td style="max-width:160px">${a.title}</td>
+                    <td>${a.severity==='high'? '<span class="sev-high">HIGH</span>': a.severity==='med'? '<span class="sev-med">MED':'<span class="sev-low">LOW'}</span></td>
+                    <td>${a.host}</td>`;
+    tr.addEventListener('click', ()=> openAlert(a));
+    tbody.appendChild(tr);
+  });
+}
+
+function segmentMatches(alert, segment){
+  // simple random mapping for demo (in real app you'd compare alert.segment)
+  if(segment==='all') return true;
+  return Math.random() > 0.4; // randomize for demo
+}
+
+function renderHosts(segment='all'){
+  // top hosts aggregation from STORE
+  const hostsAgg = {};
+  SEGMENTS.forEach(seg=>{
+    const latest = STORE[seg][STORE[seg].length-1];
+    (latest.hosts || []).forEach(h=>{
+      hostsAgg[h.host] = (hostsAgg[h.host]||0) + h.hits;
+    });
+  });
+  const top = Object.entries(hostsAgg).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  hostsBar.data.labels = top.map(t=>t[0]||'none');
+  hostsBar.data.datasets[0].data = top.map(t=>t[1]);
+  hostsBar.update();
+}
+
+/* services / status */
+function renderServices(){
+  const tbody = document.getElementById('servicesTbl'); tbody.innerHTML='';
+  const svcs = [
+    {name:'SIEM', lat: rnd(40,120)+'ms', up: rnd(98,100)+'%'},
+    {name:'EDR', lat: rnd(30,100)+'ms', up: rnd(96,100)+'%'},
+    {name:'Firewall', lat: rnd(20,80)+'ms', up: rnd(99,100)+'%'},
+    {name:'Honeypot', lat: rnd(50,160)+'ms', up: rnd(92,100)+'%'}
+  ];
+  svcs.forEach(s=>{
+    const tr = document.createElement('tr'); tr.innerHTML = <td style="color:#bfeff9">${s.name}</td><td>${s.lat}</td><td>${s.up}</td>; tbody.appendChild(tr);
+  });
+}
+
+/* update KPIs */
+function updateKPIs(segment='all', filter='all'){
+  document.getElementById('kpiSegment').innerText = (segment==='all' ? 'All' : segment.toUpperCase());
+  // aggregated counts
+  let totalAlerts = ALERTS.length;
+  if(filter!=='all') totalAlerts = ALERTS.filter(a=>a.type===filter).length;
+  document.getElementById('alertCount').innerText = totalAlerts;
+  document.getElementById('sevHigh').innerText = ALERTS.filter(a=>a.severity==='high').length;
+  // timeseries donut main
+  const totals = {malware:0,phishing:0,ddos:0,intrusion:0};
+  ALERTS.forEach(a=> totals[a.type] = (totals[a.type]||0) + 1);
+  threatDonut.data.datasets[0].data = [totals.malware, totals.phishing, totals.ddos, totals.intrusion];
+  threatDonut.update();
+}
+
+/* open alert modal */
+const modal = document.getElementById('modal'), modalClose = document.getElementById('modalClose'), modalContent = document.getElementById('modalContent');
+function openAlert(a){
+  modalContent.innerHTML = `<div style="font-weight:800">${a.title}</div>
+    <div style="margin-top:8px">ID: <strong>${a.id}</strong></div>
+    <div style="margin-top:6px">Type: <strong>${a.type}</strong></div>
+    <div style="margin-top:6px">Host: <strong>${a.host}</strong></div>
+    <div style="margin-top:6px">Severity: <strong>${a.severity}</strong></div>
+    <div style="margin-top:10px" class="small">Actions: Investigate • Isolate • Block</div>`;
+  modal.classList.add('show');
+}
+modalClose.addEventListener('click', ()=> modal.classList.remove('show'));
+
+/* UI: filter buttons and zone select */
+const segBtns = document.querySelectorAll('.seg button');
+let activeFilter = 'all';
+segBtns.forEach(b=>{
+  b.addEventListener('click', ()=>{
+    segBtns.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    activeFilter = b.dataset.filter;
+    refreshUI();
+  });
+});
+document.getElementById('zoneSelect').addEventListener('change', (e)=>{ refreshUI(); });
+
+document.getElementById('refreshBtn').addEventListener('click', ()=> {
+  seedAll(); genAlerts('all', 10); refreshUI();
+});
+document.getElementById('investigateBtn').addEventListener('click', ()=> {
+  alert('Open Investigation workflow (demo)'); // placeholder
+});
+
+/* open/close modal when clicking outside */
+modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.classList.remove('show'); });
+
+/* refresh everything */
+function refreshUI(){
+  const seg = document.getElementById('zoneSelect').value;
+  // recalc ALERTS randomly
+  if(ALERTS.length<6) genAlerts(seg, 10);
+  updateKPIs(seg, activeFilter);
+  summarizeBySegment();
+  renderAlerts(activeFilter, seg);
+  renderHosts(seg);
+  renderServices();
+  // update charts with selected segment series
+  const segKey = (seg==='all') ? 'dmz' : seg; // choose representative series
+  // timeline update
+  mainTimeline.data.labels = STORE[segKey].map((_,i)=> ${i}:00);
+  mainTimeline.data.datasets[0].data = STORE[segKey].map(s=>s.breakdown.malware);
+  mainTimeline.data.datasets[1].data = STORE[segKey].map(s=>s.breakdown.phishing);
+  mainTimeline.data.datasets[2].data = STORE[segKey].map(s=>s.breakdown.ddos);
+  mainTimeline.data.datasets[3].data = STORE[segKey].map(s=>s.breakdown.intrusion);
+  mainTimeline.update();
+
+  // small timeseries
+  threatTimes.data.datasets[0].data = STORE[segKey].map(s=> s.threats);
+  threatTimes.update();
+
+  // source radar: randomize slightly
+  sourceRadar.data.datasets[0].data = [rnd(40,90), rnd(30,95), rnd(50,95), rnd(10,60), rnd(60,99)];
+  sourceRadar.update();
+}
+
+/* initial render */
+refreshUI();
+/* periodic simulated update (live feel) */
+setInterval(()=> {
+  // push new sample to each segment
+  SEGMENTS.forEach(s=>{
+    STORE[s].push(genSnapshot(s));
+    if(STORE[s].length>24) STORE[s].shift();
+  });
+  // refresh alerts occasionally
+  if(Math.random()>0.5) genAlerts('all', rnd(6,14));
+  refreshUI();
+}, 5500);
+
+/* helper */
+function rnd(a,b){ return Math.round(a + Math.random()*(b-a)); }
+
+document.addEventListener('DOMContentLoaded', ()=> {
+  // reveal cards with stagger
+  document.querySelectorAll('.card').forEach((c,i)=> setTimeout(()=> c.classList.add('show'), i*90));
+});
+</script>
+</body>
+</html>
